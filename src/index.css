@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* Cores por função. Claro e escuro são escolhidos à parte, não invertidos. */
+:root {
+  color-scheme: light;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #64748b;
+  --series-cur: #2a78d6;      /* período atual */
+  --series-prev: #9aa39c;     /* período de comparação */
+  --good: #00692b;  --good-bg: #e3f3e8;
+  --bad: #b42d2d;   --bad-bg: #fbe8e8;   --bad-mark: #d03b3b;
+  --warn: #7a4f00;  --warn-bg: #fdf0d2;
+  --info: #1c5cab;  --info-bg: #e5eefb;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --surface: #131e30;
+  --surface-2: #1a283d;
+  --line: #29384d;
+  --line-strong: #40516a;
+  --ink: #edf3fc;
+  --ink-2: #bfcee2;
+  --ink-3: #9aafca;
+  --series-cur: #4088e5;
+  --series-prev: #94a3b8;
+  --good: #80dfab; --good-bg: #153829;
+  --bad: #ffaaaa; --bad-bg: #43262e; --bad-mark: #f27e88;
+  --warn: #f6d187; --warn-bg: #3b3020;
+  --info: #a6ceff; --info-bg: #203b60;
+}
+@theme inline {
+  --font-sans: 'Schibsted Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line2: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink-2);
+  --color-ink3: var(--ink-3);
+  --color-cur: var(--series-cur);
+  --color-prev: var(--series-prev);
+  --color-good: var(--good);
+  --color-goodbg: var(--good-bg);
+  --color-bad: var(--bad);
+  --color-badbg: var(--bad-bg);
+  --color-badmark: var(--bad-mark);
+  --color-warn: var(--warn);
+  --color-warnbg: var(--warn-bg);
+  --color-info: var(--info);
+  --color-infobg: var(--info-bg);
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.tnum { font-variant-numeric: tabular-nums; }
+button, a, select, input { outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--series-cur); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+body { background-image: radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--series-cur) 7%, transparent), transparent 45%); }
+.app-header { background: color-mix(in srgb, var(--surface) 95%, transparent); }
+.brand-mark { background: linear-gradient(135deg, #3179dc, #1449a3); box-shadow: 0 4px 12px #2364bd28; }
+section.rounded-xl, .section-nav { box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 3%, transparent); }
+button { cursor: pointer; }
+input, select { color: var(--ink); }
+select option { background: var(--surface); color: var(--ink); }
+[data-theme="dark"] .text-white { color: #fff; }
+[data-theme="dark"] button.bg-cur, [data-theme="dark"] button.bg-ink { background-color: #2563b8; color: #fff; }
+[data-theme="dark"] .recharts-default-tooltip { background-color: var(--surface) !important; border-color: var(--line) !important; }
