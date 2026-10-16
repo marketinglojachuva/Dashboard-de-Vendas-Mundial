@@ -215,7 +215,7 @@ export function dropClues(r: AdRow): string[] {
   if (r.priceChangePct !== null && r.priceChangePct <= -3) out.push(`Preço caiu ${Math.abs(r.priceChangePct).toFixed(0)}%`)
   if (r.prev && r.prev.sponsoredUnits > 0 && r.cur.sponsoredUnits < r.prev.sponsoredUnits)
     out.push(`Vendas por publicidade: ${r.prev.sponsoredUnits} → ${r.cur.sponsoredUnits}`)
-  if (r.cur.sponsoredUnits === 0 && (r.prev?.sponsoredUnits ?? 0) === 0) out.push('Sem publicidade')
+  if (r.cur.sponsoredUnits === 0 && (r.prev?.sponsoredUnits ?? 0) === 0) out.push('Sem vendas atribuídas à publicidade')
   if (r.cur.cancelled > 0) out.push(`${r.cur.cancelled} cancelada(s)/devolvida(s)`)
   return out
 }

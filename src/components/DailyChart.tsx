@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ImportRecord } from '@/lib/types'
 import { dailySeries } from '@/lib/analytics'
-import { brl0, dayMonth, int } from '@/lib/format'
+import { brl, dayMonth, int } from '@/lib/format'
 
 type Metric = 'units' | 'gross'
 
 function Tip({ active, payload, metric, curLabel, prevLabel }: any) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
-  const f = (v?: number) => (v === undefined ? '—' : metric === 'units' ? `${int(v)} un.` : brl0(v))
+  const f = (v?: number) => (v === undefined ? '—' : metric === 'units' ? `${int(v)} un.` : brl(v))
   return (
     <div className="rounded-lg border border-line2 bg-surface px-3 py-2 text-xs shadow-lg">
       <div className="space-y-1">
@@ -77,8 +77,8 @@ export default function DailyChart({ cur, prev }: { cur: ImportRecord; prev: Imp
               {data.map((d) => (
                 <tr key={d.i} className="border-t border-line">
                   <td className="py-1.5">{d.curDate ? dayMonth(d.curDate) : '—'}</td>
-                  <td>{d.c === undefined ? '—' : metric === 'units' ? int(d.c) : brl0(d.c)}</td>
-                  {prev && <><td>{d.prevDate ? dayMonth(d.prevDate) : '—'}</td><td>{d.p === undefined ? '—' : metric === 'units' ? int(d.p) : brl0(d.p)}</td></>}
+                  <td>{d.c === undefined ? '—' : metric === 'units' ? int(d.c) : brl(d.c)}</td>
+                  {prev && <><td>{d.prevDate ? dayMonth(d.prevDate) : '—'}</td><td>{d.p === undefined ? '—' : metric === 'units' ? int(d.p) : brl(d.p)}</td></>}
                 </tr>
               ))}
             </tbody>

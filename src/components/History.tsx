@@ -3,7 +3,7 @@ import { Download, FolderOpen, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ImportRecord } from '@/lib/types'
 import { periodDays, summarize } from '@/lib/analytics'
-import { brl0, dateTimeBR, dayFull, int } from '@/lib/format'
+import { brl, dateTimeBR, dayFull, int } from '@/lib/format'
 import { downloadBackup, readBackup } from '@/lib/storage'
 import { isDate } from '@/lib/periods'
 import { Button, Card, EmptyNote, Tag } from './ui'
@@ -68,7 +68,7 @@ export default function History({ items, curId, prevId, onUseAsCurrent, onUseAsP
                     </td>
                     <td className="px-3 py-3 text-ink2">{dayFull(r.periodStart)} a {dayFull(r.periodEnd)}<span className="block text-xs text-ink3">{periodDays(r)} dias · {r.coverageConfirmed ? 'Cobertura confirmada' : 'Cobertura estimada'}</span><Coverage record={r} onSave={onUpdate}/></td>
                     <td className="px-3 py-3 text-right text-ink">{int(t.units)}</td>
-                    <td className="px-3 py-3 text-right text-ink">{brl0(t.gross)}</td>
+                    <td className="px-3 py-3 text-right text-ink">{brl(t.gross)}</td>
                     <td className="px-3 py-3 text-ink2">{dateTimeBR(r.importedAt)}</td>
                     <td className="py-3 pl-3 pr-5">
                       <div className="flex flex-wrap gap-1.5">
@@ -95,5 +95,5 @@ function Coverage({record,onSave}:{record:ImportRecord;onSave:(r:ImportRecord)=>
   const dates=record.lines.map(l=>l.date.slice(0,10)).sort()
   const invalid=!isDate(start)||!isDate(end)||start>end||start>dates[0]||end<dates[dates.length-1]||!!record.exportedAt&&end>record.exportedAt.slice(0,10)
   if(!editing)return <button className="mt-2 text-xs font-semibold text-cur underline" onClick={()=>setEditing(true)}>Conferir cobertura</button>
-  return <div className="mt-2 space-y-2"><label className="block text-xs">Início exportado<input type="date" value={start} onChange={e=>setStart(e.target.value)} className="block rounded border border-line p-1"/></label><label className="block text-xs">Fim exportado<input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="block rounded border border-line p-1"/></label>{invalid&&<p className="max-w-64 text-xs text-bad">O intervalo deve conter todas as vendas e terminar até a data da exportação.</p>}<Button disabled={invalid||saving} onClick={async()=>{setSaving(true);try{await onSave({...record,periodStart:start,periodEnd:end,coverageConfirmed:true});setEditing(false)}catch{toast.error('Não foi possível salvar a cobertura.')}finally{setSaving(false)}}}>Confirmar datas</Button></div>
+  return <div className="mt-2 space-y-2"><p className="max-w-64 text-xs text-ink3">Informe o intervalo completo escolhido na exportação do Mercado Livre, mesmo se houver dias sem vendas.</p><label className="block text-xs">Início exportado<input type="date" value={start} onChange={e=>setStart(e.target.value)} className="block rounded border border-line p-1"/></label><label className="block text-xs">Fim exportado<input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="block rounded border border-line p-1"/></label>{invalid&&<p className="max-w-64 text-xs text-bad">O intervalo deve conter todas as vendas e terminar até a data da exportação.</p>}<Button disabled={invalid||saving} onClick={async()=>{setSaving(true);try{await onSave({...record,periodStart:start,periodEnd:end,coverageConfirmed:true});setEditing(false)}catch{toast.error('Não foi possível salvar a cobertura.')}finally{setSaving(false)}}}>Confirmar datas</Button></div>
 }

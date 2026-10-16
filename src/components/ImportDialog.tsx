@@ -4,7 +4,7 @@ import { AlertTriangle, FileSpreadsheet, Loader2, X } from 'lucide-react'
 import type { ImportRecord } from '@/lib/types'
 import { fingerprint, periodDays, summarize } from '@/lib/analytics'
 import { parseSalesFile, SpreadsheetError } from '@/lib/parseMercadoLivre'
-import { brl0, int, plural } from '@/lib/format'
+import { brl, int, plural } from '@/lib/format'
 import { isDate } from '@/lib/periods'
 import { Button } from './ui'
 
@@ -61,7 +61,7 @@ export default function ImportDialog({ open, onOpenChange, existing, importer, o
           <div className="flex items-start justify-between gap-4">
             <div>
               <Dialog.Title className="text-lg font-semibold text-ink">Importar planilha de vendas</Dialog.Title>
-              <Dialog.Description className="mt-1 text-[13px] text-ink3">Dados pessoais dos compradores (nome, CPF, endereço) são descartados na leitura.</Dialog.Description>
+              <Dialog.Description className="mt-1 text-[13px] text-ink3">A análise não inclui dados pessoais dos compradores. O XLSX original é guardado de forma privada na sua conta quando a nuvem está ativa.</Dialog.Description>
             </div>
             <Dialog.Close aria-label="Fechar" className="rounded-md p-1 text-ink3 hover:bg-surface2"><X className="h-5 w-5" /></Dialog.Close>
           </div>
@@ -79,7 +79,7 @@ export default function ImportDialog({ open, onOpenChange, existing, importer, o
                   <dl className="tnum mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                     <div><dt className="text-ink3">Vendas</dt><dd className="font-semibold text-ink">{int(t!.orders)}</dd></div>
                     <div><dt className="text-ink3">Unidades</dt><dd className="font-semibold text-ink">{int(t!.units)}</dd></div>
-                    <div><dt className="text-ink3">Faturamento</dt><dd className="font-semibold text-ink">{brl0(t!.gross)}</dd></div>
+                    <div><dt className="text-ink3">Faturamento</dt><dd className="font-semibold text-ink">{brl(t!.gross)}</dd></div>
                     <div><dt className="text-ink3">Anúncios</dt><dd className="font-semibold text-ink">{int(t!.ads)}</dd></div>
                   </dl>
                   {t!.cancelledOrders + t!.returnedOrders > 0 && <p className="mt-3 text-ink3">{plural(t!.cancelledOrders + t!.returnedOrders, 'venda cancelada ou devolvida ficou', 'vendas canceladas ou devolvidas ficaram')} fora dos totais.</p>}
@@ -90,14 +90,15 @@ export default function ImportDialog({ open, onOpenChange, existing, importer, o
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block text-[13px] font-medium text-ink">Início do período
-                    <input type="date" value={draft.periodStart} onChange={(e) => setDraft({ ...draft, periodStart: e.target.value })} className="mt-1 w-full rounded-lg border border-line2 bg-surface px-3 py-2 text-sm font-normal" />
+                    <input type="date" value={draft.periodStart} onChange={(e) => setDraft({ ...draft, periodStart: e.target.value, coverageConfirmed: false })} className="mt-1 w-full rounded-lg border border-line2 bg-surface px-3 py-2 text-sm font-normal" />
                   </label>
                   <label className="block text-[13px] font-medium text-ink">Fim do período
-                    <input type="date" value={draft.periodEnd} onChange={(e) => setDraft({ ...draft, periodEnd: e.target.value })} className="mt-1 w-full rounded-lg border border-line2 bg-surface px-3 py-2 text-sm font-normal" />
+                    <input type="date" value={draft.periodEnd} onChange={(e) => setDraft({ ...draft, periodEnd: e.target.value, coverageConfirmed: false })} className="mt-1 w-full rounded-lg border border-line2 bg-surface px-3 py-2 text-sm font-normal" />
                   </label>
                 </div>
                 <p className="text-xs text-ink3">{invalidDates ? <span className="text-bad">O intervalo deve conter todas as vendas e terminar até a data da exportação.</span> : <>Detectado pelas datas das vendas: {plural(periodDays(draft), 'dia', 'dias')}. Ajuste só se você exportou um intervalo maior que o das vendas.</>}</p>
 
+                <p className="rounded-lg bg-warnbg p-3 text-xs text-warn">Confira o intervalo completo escolhido ao exportar no Mercado Livre, incluindo dias sem vendas. A primeira e a última venda são apenas uma estimativa. Confirme as datas abaixo para salvar.</p>
                 <label className="flex items-start gap-2 text-xs text-ink3"><input type="checkbox" checked={!!draft.coverageConfirmed} onChange={e=>setDraft({...draft,coverageConfirmed:e.target.checked})}/>Confirmo que estas são as datas usadas na exportação, incluindo dias sem vendas. O dia da exportação será tratado como parcial.</label>
                 <p className="rounded-lg bg-infobg p-3 text-xs text-info">Conferência: {draft.audit?.saleRows ?? draft.lines.length} registros de produtos · {draft.audit?.packageRows ?? 0} resumos de pacotes · nenhuma linha ignorada.</p>
                 {dup && <p role="alert" className="flex items-start gap-2 rounded-lg bg-warnbg px-3 py-2 text-[13px] text-warn"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />Parece que esta planilha já foi importada como “{dup.label}”.</p>}
@@ -105,7 +106,7 @@ export default function ImportDialog({ open, onOpenChange, existing, importer, o
 
                 <div className="flex justify-end gap-2 pt-1">
                   <Button variant="ghost" onClick={reset}>Trocar arquivo</Button>
-                  <Button variant="primary" disabled={saving || invalidDates || !draft.label.trim()} onClick={async () => { setSaving(true); try { await onSave(draft) } finally { setSaving(false) } }}>
+                  <Button variant="primary" disabled={saving || invalidDates || !draft.coverageConfirmed || !draft.label.trim()} onClick={async () => { setSaving(true); try { await onSave(draft) } finally { setSaving(false) } }}>
                     {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{existing.some(r=>r.filename===draft.filename) ? 'Atualizar este arquivo' : 'Salvar e analisar'}
                   </Button>
                 </div>
