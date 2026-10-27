@@ -14,6 +14,10 @@ export function consolidate(records: ImportRecord[]) {
   let duplicates = 0
   const sorted = [...records].sort((a,b)=>freshness(a).localeCompare(freshness(b)) || a.importedAt.localeCompare(b.importedAt))
   for (const r of sorted) {
+    const excluded = new Set(r.excludedSaleIds ?? [])
+    for (const [key, line] of map) {
+      if (excluded.has(line.saleId)) map.delete(key)
+    }
     for (const l of r.lines) {
       const key = saleKey(l)
       if (map.has(key)) duplicates++

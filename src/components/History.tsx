@@ -64,6 +64,7 @@ export default function History({ items, curId, prevId, onUseAsCurrent, onUseAsP
                         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                         className="w-56 rounded-md border border-transparent bg-transparent px-1.5 py-1 font-medium text-ink hover:border-line2 focus:border-line2" />
                       <p className="mt-0.5 truncate px-1.5 text-xs text-ink3" title={r.filename}>{r.filename}</p>
+                      {!!r.audit?.rejectedRows && <p className="mt-1 max-w-64 px-1.5 text-xs text-warn">{r.audit.rejectedRows} linha(s) ignorada(s) por pós-venda ou pacote vinculado. Totais apenas dos registros aceitos.</p>}
                       <div className="mt-1 flex gap-1.5 px-1.5">{r.id === curId && <Tag tone="info">Período atual</Tag>}{r.id === prevId && <Tag>Comparação</Tag>}</div>
                     </td>
                     <td className="px-3 py-3 text-ink2">{dayFull(r.periodStart)} a {dayFull(r.periodEnd)}<span className="block text-xs text-ink3">{periodDays(r)} dias · {r.coverageConfirmed ? 'Cobertura confirmada' : 'Cobertura estimada'}</span><Coverage record={r} onSave={onUpdate}/></td>

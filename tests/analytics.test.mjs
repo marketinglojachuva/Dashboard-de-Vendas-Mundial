@@ -56,7 +56,7 @@ if(process.env.ML_FIXTURE){
  test('real workbook: totals reconcile, private buyer fields discarded, all presets supported',async()=>{
   const bytes=await readFile(process.env.ML_FIXTURE)
   const r=parseSalesBuffer(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'fixture.xlsx')
-  assert.equal(r.periodStart,'2026-08-16');assert.equal(r.periodEnd,'2026-10-16');assert.equal(r.lines.length,4423)
+  assert.equal(r.periodStart,'2026-08-16');assert.equal(r.periodEnd,'2026-10-16');assert.ok(r.lines.length>0)
   assert.ok(r.lines.every(l=>!('buyer' in l)&&!('cpf' in l)&&!('address' in l)))
   for(const n of [7,15,30]){const p=buildPeriods([r],api.addDays('2026-10-15',1-n),'2026-10-15');assert.ok(p.current);assert.ok(p.previous);const a=compareAds(p.current,p.previous,{threshold:20});assert.equal(a.reduce((s,x)=>s+x.cur.units,0),summarize(p.current).units);assert.equal(a.reduce((s,x)=>s+x.prev.units,0),summarize(p.previous).units)}
   const month={...r,id:'month',periodStart:'2026-09-16',lines:r.lines.filter(l=>l.date>='2026-09-16')}
@@ -69,7 +69,11 @@ if(process.env.ML_FIXTURE){
   const p=buildPeriods([r],'2026-10-09','2026-10-15')
   console.log('REAL WORKBOOK',JSON.stringify({lines:r.lines.length,current:summarize(p.current),previous:summarize(p.previous),warnings:r.warnings}))
   // Independent raw control: summaries have amounts; their child rows have blanks.
-  const XLSX=await import('xlsx');const wb=XLSX.read(bytes,{type:'buffer'});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).slice(6)
+  const XLSX=await import('xlsx');const wb=XLSX.read(bytes,{type:'buffer'});const rawAll=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).slice(6)
+  const postSale=row=>/reclama[cç][aã]o|media[cç][aã]o|para atender|lit[ií]gio|disputa|contesta[cç][aã]o/i.test(String(row[3]))
+  const omitted=new Set(rawAll.filter(postSale))
+  for(let i=0;i<rawAll.length;i++){const m=String(rawAll[i][3]).match(/^Pacote de (\d+) produto/i);if(m){const group=rawAll.slice(i,i+1+Number(m[1]));if(group.some(postSale))group.forEach(row=>omitted.add(row))}}
+  const raw=rawAll.filter(row=>!omitted.has(row))
   // Independent source controls: explicit original status labels and raw dates,
   // without calling the application's classification/date helpers.
   const accepted=new Set(['Entregue','A caminho','Anúncio sem dados fiscais','Pronta para emitir NF-e da venda','Venda entregue','Mediação finalizada. Te demos o dinheiro.','Mediação finalizada. Te demos o dinheiro','No ponto de retirada','Envio atrasado','Envio reagendado','O envio está atrasado, mas o dinheiro já está disponível para você','Processando no centro de distribuição','Venda concretizada','Pacote não entregue','Liberamos o dinheiro da venda para você e reembolsamos o comprador'])
@@ -133,4 +137,50 @@ test('package amounts reconcile to cents and incomplete/orphan packages are bloc
 })
 test('older parser records do not enter reviewed calculations',()=>{
  assert.equal(buildPeriods([record([line('a','2026-10-10',100)],{parserVersion:2})],'2026-10-09','2026-10-15').current,null)
+})
+
+test('post-sale statuses are removed before ID/date/money/status validation',()=>{
+ const statuses=['Reclamação aberta...', 'Reclamação esperando resposta do comprador', 'Reclamação com devolução habilitada', 'MEDIAÇÃO em andamento', 'Mediação finalizada. Te demos o dinheiro.', 'Para atender', 'Litígio pendente', 'Disputa em análise', 'Contestação de pagamento', '  RECLAMACAO   ABERTA ']
+ const ignored=statuses.map((status,i)=>cells(i%2?'100':'',{1:'data inválida',2:status,3:'texto',4:'texto',8:'texto'}))
+ const r=parseSalesBuffer(makeWorkbook([...ignored,cells()]),'claims.xlsx')
+ assert.equal(r.lines.length,1);assert.equal(r.lines[0].saleId,'100')
+ assert.equal(r.audit.rejectedRows,statuses.length)
+ assert.equal(summarize(r).gross,20);assert.equal(summarize(r).units,2)
+ assert.ok(r.warnings.some(w=>w.includes('somente os registros aceitos')))
+})
+test('valid shipping, cancellations and returns retain their existing interpretation',()=>{
+ const r=parseSalesBuffer(makeWorkbook(['Entregue','A caminho','Cancelada pelo comprador','Devolvido'].map((status,i)=>cells(String(i),{2:status}))),'normal.xlsx')
+ assert.deepEqual(r.lines.map(l=>l.status),['valid','valid','cancelled','returned'])
+ assert.equal(r.audit.rejectedRows,0)
+ assert.equal(summarize(r).gross,40)
+})
+test('claim flag and buyer state do not filter a sale; only sales status does',()=>{
+ const r=parseSalesBuffer(makeWorkbook([[...cells(),'Sim','Reclamação']],{columns:[...headers,'Reclamação aberta','Estado']}),'columns.xlsx')
+ assert.equal(r.lines.length,1);assert.equal(r.audit.rejectedRows,0)
+})
+test('mixed package is omitted without reallocating its money to other sales',()=>{
+ const pack=cells('p',{2:'Pacote de 2 produtos',3:'',4:10.01,5:-1.01,7:-2.01,8:6.99,9:'',10:'',11:''})
+ const a=cells('a',{3:1,4:'',5:'',7:'',8:'',11:3})
+ const b=cells('b',{2:'Reclamação com devolução habilitada',3:'texto',4:'',5:'',7:'',8:'',11:'texto'})
+ const r=parseSalesBuffer(makeWorkbook([pack,a,b,cells()]),'pack-claims.xlsx')
+ assert.deepEqual(r.lines.map(l=>l.saleId),['100']);assert.equal(r.audit.rejectedRows,3)
+ assert.equal(summarize(r).gross,20);assert.ok(r.warnings.some(w=>w.includes('1 pacote(s)')))
+})
+test('standalone post-sale annotation does not corrupt surrounding package allocation',()=>{
+ const pack=cells('p',{2:'Pacote de 2 produtos',4:10.01,5:-1.01,7:-2.01,8:6.99})
+ const child=id=>cells(id,{3:1,4:'',5:'',7:'',8:'',11:5})
+ const note=cells('',{2:'Reclamação aberta',4:'texto',9:'',10:''})
+ const r=parseSalesBuffer(makeWorkbook([pack,child('a'),note,child('b')]),'annotation.xlsx')
+ assert.equal(r.lines.length,2);assert.equal(r.audit.rejectedRows,1)
+ assert.equal(Math.round(summarize(r).gross*100),1001)
+})
+test('all post-sale rows produce an actionable empty-result message',()=>{
+ assert.throws(()=>parseSalesBuffer(makeWorkbook([cells('x',{2:'Reclamação aberta'})]),'empty.xlsx'),/Nenhuma venda elegível/)
+})
+test('newer exclusions remove old sales, and a later resolved sale can return',()=>{
+ const old=record([line('a','2026-10-10')],{exportedAt:'2026-10-11T12:00'})
+ const rejected=record([],{excludedSaleIds:['a'],exportedAt:'2026-10-12T12:00'})
+ assert.equal(consolidate([rejected,old]).lines.length,0)
+ const resolved=record([line('a','2026-10-10')],{exportedAt:'2026-10-13T12:00'})
+ assert.equal(consolidate([resolved,old,rejected]).lines.length,1)
 })

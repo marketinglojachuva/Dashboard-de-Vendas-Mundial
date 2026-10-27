@@ -59,6 +59,13 @@ const isBlank = (v: unknown) => v === null || v === undefined || String(v).trim(
 const text = (v: unknown) => String(v ?? '').trim()
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+// Only the sales status is inspected, never buyer state or the claim flag.
+// Run before IDs, dates, amounts and status validation: these may be absent
+// or contain descriptive text on post-sale rows.
+function isPostSaleStatus(value: unknown): boolean {
+  return /\b(reclamacao|reclamacoes|mediacao|mediacoes|litigio|litigios|disputa|disputas|contestacao|contestacoes)\b|\bpara atender\b/.test(norm(value))
+}
+
 function classify(statusText: string): { status: SaleStatus; stage: Stage } {
   const s = norm(statusText)
   if (s.includes('cancel')) return { status: 'cancelled', stage: 'other' }
@@ -200,6 +207,34 @@ export function parseSalesBuffer(buffer: ArrayBuffer, filename: string): ImportR
   const get = (r: Row, key: string) => (cols[key] >= 0 ? r[cols[key]] : '')
   const lines: SaleLine[] = []
   const warnings: string[] = []
+  const dataRows = rows.slice(headerIdx + 1)
+  const excluded = new Set(dataRows.filter(r => isPostSaleStatus(get(r, 'status'))))
+  let excludedPackages = 0
+  // A package total cannot be reassigned to only its surviving products.
+  // If one of its product rows is excluded, omit the entire package and warn.
+  for (let i = 0; i < dataRows.length; i++) {
+    const match = norm(get(dataRows[i], 'status')).match(/^pacote de (\d+) produto/)
+    if (!match) continue
+    const packageRows = [dataRows[i]]
+    let remaining = Number(match[1])
+    for (let j = i + 1; j < dataRows.length && remaining > 0; j++) {
+      const row = dataRows[j]
+      if (/^pacote de \d+ produto/.test(norm(get(row, 'status')))) break
+      const product = !!text(get(row, 'adId')) || !!text(get(row, 'title'))
+      if (excluded.has(row) && !product) continue // Separate post-sale annotation.
+      if (!text(get(row, 'saleId')) && !product) continue
+      if (!isBlank(get(row, 'gross'))) break
+      packageRows.push(row)
+      remaining--
+    }
+    if (packageRows.some(row => excluded.has(row))) {
+      packageRows.forEach(row => excluded.add(row))
+      excludedPackages++
+    }
+  }
+  const acceptedRows = dataRows.filter(row => !excluded.has(row))
+  if (excluded.size) warnings.push(`${excluded.size} linha(s) ignorada(s) por pós-venda/reclamação ou por vínculo com um pacote excluído. Os totais consideram somente os registros aceitos, não o total integral do relatório.`)
+  if (excludedPackages) warnings.push(`${excludedPackages} pacote(s) excluído(s) integralmente por conter produto em pós-venda. O valor desses pacotes não foi redistribuído entre os demais produtos.`)
   let rowsRead = 0
   const seen = new Set<string>()
   let packCount = 0
@@ -213,7 +248,7 @@ export function parseSalesBuffer(buffer: ArrayBuffer, filename: string): ImportR
     }
   }
 
-  for (const r of rows.slice(headerIdx + 1)) {
+  for (const r of acceptedRows) {
     const saleId = text(get(r, 'saleId'))
     if (!saleId) { if(text(get(r,'date'))||text(get(r,'adId')))throw new SpreadsheetError('Existe uma venda sem identificador. A importação foi interrompida.'); continue }
     if(typeof get(r,'saleId')==='number'&&!Number.isSafeInteger(get(r,'saleId')))throw new SpreadsheetError('Um ID de venda foi convertido em número e perdeu precisão. Use o XLSX original exportado pelo Mercado Livre.')
@@ -295,11 +330,11 @@ export function parseSalesBuffer(buffer: ArrayBuffer, filename: string): ImportR
   if(!exportedAt)throw new SpreadsheetError('Não foi encontrada a data de geração do relatório. Use o arquivo original do Mercado Livre para comparar dias completos com segurança.')
   if(lines.some(l=>l.date.slice(0,10)>exportedAt!.slice(0,10)))throw new SpreadsheetError('Existe uma venda com data posterior à geração do relatório. Confira o arquivo original.')
   if(lines.some(l=>l.date>exportedAt!))warnings.push('Existem horários de venda posteriores ao horário de geração indicado no arquivo. A análise usa datas e exclui o dia de geração inteiro.')
-  if (!lines.length) throw new SpreadsheetError('A planilha não tem nenhuma venda.')
+  if (!lines.length) throw new SpreadsheetError(excluded.size ? 'Nenhuma venda elegível após o filtro de pós-venda. Todas as linhas foram ignoradas; nenhum dado foi salvo.' : 'A planilha não tem nenhuma venda.')
 
   // Reconcile raw financial columns, including package summaries, with parsed lines.
   for(const [column,key] of [['gross','gross'],['fee','fee'],['net','net'],['refund','refund']] as const){
-    const expected=rows.slice(headerIdx+1).filter(r=>text(get(r,'saleId'))).reduce((sum,r)=>sum+Math.round(num(get(r,column))*100),0)
+    const expected=acceptedRows.filter(r=>text(get(r,'saleId'))).reduce((sum,r)=>sum+Math.round(num(get(r,column))*100),0)
     const actual=lines.reduce((sum,l)=>sum+Math.round((l[key]??0)*100),0)
     if(expected!==actual)throw new SpreadsheetError(`Os totais financeiros de ${column} não conferem com as linhas do arquivo. A importação foi interrompida.`)
   }
@@ -311,7 +346,8 @@ export function parseSalesBuffer(buffer: ArrayBuffer, filename: string): ImportR
   return {
     version: 1,
     parserVersion: 3,
-    audit: { saleRows: lines.length, packageRows: packCount, rejectedRows: 0 },
+    audit: { saleRows: lines.length, packageRows: packCount, rejectedRows: excluded.size },
+    excludedSaleIds: [...new Set([...excluded].map(row => text(get(row, 'saleId'))).filter(Boolean))],
     id: `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
     filename,
     importedAt: new Date().toISOString(),

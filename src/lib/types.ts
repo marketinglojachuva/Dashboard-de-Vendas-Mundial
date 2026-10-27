@@ -48,6 +48,8 @@ export interface ImportRecord {
   cloudRevision?: number
   originalPath?: string
   audit?: { saleRows: number; packageRows: number; rejectedRows: number }
+  /** Prevent older exports from restoring sales excluded by a newer report. */
+  excludedSaleIds?: string[]
   parserVersion?: number
   coverageConfirmed?: boolean
   version: 1

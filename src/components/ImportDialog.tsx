@@ -100,7 +100,7 @@ export default function ImportDialog({ open, onOpenChange, existing, importer, o
 
                 <p className="rounded-lg bg-warnbg p-3 text-xs text-warn">Confira o intervalo completo escolhido ao exportar no Mercado Livre, incluindo dias sem vendas. A primeira e a última venda são apenas uma estimativa. Confirme as datas abaixo para salvar.</p>
                 <label className="flex items-start gap-2 text-xs text-ink3"><input type="checkbox" checked={!!draft.coverageConfirmed} onChange={e=>setDraft({...draft,coverageConfirmed:e.target.checked})}/>Confirmo que estas são as datas usadas na exportação, incluindo dias sem vendas. O dia da exportação será tratado como parcial.</label>
-                <p className="rounded-lg bg-infobg p-3 text-xs text-info">Conferência: {draft.audit?.saleRows ?? draft.lines.length} registros de produtos · {draft.audit?.packageRows ?? 0} resumos de pacotes · nenhuma linha ignorada.</p>
+                <p className="rounded-lg bg-infobg p-3 text-xs text-info">Conferência: {draft.audit?.saleRows ?? draft.lines.length} registros de produtos · {draft.audit?.packageRows ?? 0} resumos de pacotes · {draft.audit?.rejectedRows ?? 0} linha(s) ignorada(s).</p>
                 {dup && <p role="alert" className="flex items-start gap-2 rounded-lg bg-warnbg px-3 py-2 text-[13px] text-warn"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />Parece que esta planilha já foi importada como “{dup.label}”.</p>}
                 {draft.warnings.map((w) => <p key={w} className="text-xs text-ink3">{w}</p>)}
 
